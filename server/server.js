@@ -1,7 +1,10 @@
 
+require("dotenv").config();
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const connectDB = require("./config/db");
 
 const app = express();
 
@@ -9,13 +12,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Connect to MongoDB
-mongoose
-  .connect("mongodb://127.0.0.1:27017/taskmanager")
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch((err) => console.error("MongoDB connection error:", err));
-
-// Define Task Schema
+// Task Schema
 const TaskSchema = new mongoose.Schema(
   {
     title: {
@@ -32,8 +29,13 @@ const TaskSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Create Task Model
+// Task Model
 const Task = mongoose.model("Task", TaskSchema);
+
+// Home Route
+app.get("/", (req, res) => {
+  res.send("Task Management API is Running!");
+});
 
 // GET: Fetch all tasks
 app.get("/tasks", async (req, res) => {
@@ -41,7 +43,7 @@ app.get("/tasks", async (req, res) => {
     const tasks = await Task.find();
     res.json(tasks);
   } catch (err) {
-    console.error("Error fetching tasks:", err);
+    console.error(err);
     res.status(500).json({
       message: "Could not fetch tasks.",
     });
@@ -59,13 +61,15 @@ app.post("/tasks", async (req, res) => {
       });
     }
 
-    const newTask = new Task({ title: title.trim() });
-    const savedTask = await newTask.save();
+    const newTask = new Task({
+      title: title.trim(),
+    });
 
+    const savedTask = await newTask.save();
     res.status(201).json(savedTask);
   } catch (err) {
-    console.error("Error creating task:", err);
-    res.status(400).json({
+    console.error(err);
+    res.status(500).json({
       message: "Could not create task.",
     });
   }
@@ -76,7 +80,11 @@ app.patch("/tasks/:id", async (req, res) => {
   try {
     const { status } = req.body;
 
-    const allowedStatuses = ["Pending", "Ongoing", "Completed"];
+    const allowedStatuses = [
+      "Pending",
+      "Ongoing",
+      "Completed",
+    ];
 
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({
@@ -98,7 +106,7 @@ app.patch("/tasks/:id", async (req, res) => {
 
     res.json(updatedTask);
   } catch (err) {
-    console.error("Error updating task:", err);
+    console.error(err);
     res.status(500).json({
       message: "Could not update task status.",
     });
@@ -118,18 +126,31 @@ app.delete("/tasks/:id", async (req, res) => {
       });
     }
 
-    res.json({ message: "Task deleted successfully." });
+    res.json({
+      message: "Task deleted successfully.",
+    });
   } catch (err) {
-    console.error("Error deleting task:", err);
+    console.error(err);
     res.status(500).json({
       message: "Could not delete task.",
     });
   }
 });
 
-// Start server
+// Start server after MongoDB connects
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await connectDB();
+
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Server startup failed:", error.message);
+    process.exit(1);
+  }
+};
+
+startServer();
